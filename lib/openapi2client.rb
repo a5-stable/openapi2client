@@ -1,3 +1,4 @@
+require "openapi2client/cli"
 require "openapi2client/version"
 
 module Openapi2client

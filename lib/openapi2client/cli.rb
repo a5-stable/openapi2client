@@ -1,5 +1,6 @@
 require 'thor'
-require 'fileutils' 
+require 'fileutils'
+require 'json'
 
 module Openapi2client
   class CLI < Thor
@@ -18,12 +19,16 @@ module Openapi2client
       Dir.mkdir("outputs/")
       Dir.mkdir("outputs/lib")
       data["tags"].each do |tag|
-        FileUtils.touch("outputs/lib/#{tag["name"]}.rb")
+        file_name = "outputs/lib/#{tag["name"]}.rb"
+        FileUtils.touch(file_name)
+        File.open(file_name, "w") do |file|
+          file.puts "class #{tag["name"].capitalize}"
+        end
       end
 
       FileUtils.touch("outputs/lib/client.rb")
 
-      template_file_path = "../templates/client.rb"
+      template_file_path = "lib/templates/client.rb"
       copied_file_path = "outputs/lib/client.rb"
 
       # Read the content of the template file
@@ -37,9 +42,30 @@ module Openapi2client
 
       data["paths"].each do |pathname, hash|
         method = hash.keys.first
-        target_file = "lib/#{hash[method]["tags"][0]}"
+        hash = hash[method]
+        target_file = "outputs/lib/#{hash["tags"][0]}.rb"
+        method_name = hash["operationId"]
 
-        method_name = operationId
+        args = hash["parameters"].map {|param| param["name"]}
+
+        method = <<-"EOS"
+  # #{hash["description"].to_s.empty? ? "comment not attached" : hash["description"]}
+  def #{method_name}(#{args.join(",")})
+    #{method}(#{args.join(",")})
+  end
+
+EOS
+
+        File.open(target_file, "a") do |file|
+          file.puts(method)
+        end
+      end
+
+      data["tags"].each do |tag|
+        file_name = "outputs/lib/#{tag["name"]}.rb"
+        File.open(file_name, "a") do |file|
+          file.puts "end"
+        end
       end
     end
   end
